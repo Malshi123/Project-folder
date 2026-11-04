@@ -1,11 +1,12 @@
 import json
 from multiprocessing import connection
 import os
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, session
 import mysql.connector
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
+app.secret_key = "change-this-to-a-long-random-text"
 
 FILE_NAME = os.path.join(os.path.dirname(os.path.abspath(__file__)),"expenses.json")
 
@@ -114,6 +115,31 @@ def register():
         db.close()
         return redirect("/")
     return render_template("register.html", error=None)
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT id, password_hash FROM users WHERE username = %s", (username,))
+        user = cursor.fetchone()
+        db.close()
+
+        if user and check_password_hash(user[1], password):
+            session["user_id"] = user[0]
+            return redirect("/")
+
+        return render_template("login.html", error="Wrong username or password.")
+
+    return render_template("login.html", error=None)
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
 
 if __name__ == "__main__":
     app.run(debug=True)
