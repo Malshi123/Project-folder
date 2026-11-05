@@ -80,38 +80,61 @@ def add():
 
     return redirect("/")
 
-@app.route("/delete/<int:index>", methods=["POST"])
-def delete(index):
-    expenses = load_expenses()
+@app.route("/delete/<int:expense_id>", methods=["POST"])
+def delete(expense_id):
+    if "user_id" not in session:
+        return redirect("/login")
 
-    if 0 <= index < len(expenses):
-        expenses.pop(index)
-        save_expenses(expenses)
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "DELETE FROM expenses WHERE id = %s AND user_id = %s",
+        (expense_id, session["user_id"])
+    )
+    db.commit()
+    db.close()
 
     return redirect("/")
 
-@app.route("/edit/<int:index>")
-def edit(index):
-    expenses = load_expenses()
+@app.route("/edit/<int:expense_id>")
+def edit(expense_id):
+    if "user_id" not in session:
+        return redirect("/login")
 
-    if 0 <= index < len(expenses):
-        expense = expenses[index]
-        return render_template("edit.html", index=index, expense=expense)
-    else:
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT id, amount, category, note, expense_date AS date "
+        "FROM expenses WHERE id = %s AND user_id = %s",
+        (expense_id, session["user_id"])
+    )
+    expense = cursor.fetchone()
+    db.close()
+
+    if expense is None:
         return redirect("/")
 
-@app.route("/update/<int:index>", methods=["POST"])
-def update(index):
-    expenses = load_expenses()
+    return render_template("edit.html", index=expense_id, expense=expense)
 
-    if 0 <= index < len(expenses):
-        expenses[index] = {
-            "amount": float(request.form["amount"]),
-            "category": request.form["category"],
-            "note": request.form["note"],
-            "date": request.form["date"]
-        }
-        save_expenses(expenses)
+@app.route("/update/<int:expense_id>", methods=["POST"])
+def update(expense_id):
+    if "user_id" not in session:
+        return redirect("/login")
+
+    amount = float(request.form["amount"])
+    category = request.form["category"]
+    note = request.form["note"]
+    date = request.form["date"]
+
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "UPDATE expenses SET amount = %s, category = %s, note = %s, expense_date = %s "
+        "WHERE id = %s AND user_id = %s",
+        (amount, category, note, date, expense_id, session["user_id"])
+    )
+    db.commit()
+    db.close()
 
     return redirect("/")
 
