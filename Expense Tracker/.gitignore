@@ -1,5 +1,0 @@
-.env
-expenses.json
-__pycache__/
-venv/
-.DS_Store
