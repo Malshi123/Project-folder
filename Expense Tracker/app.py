@@ -31,10 +31,23 @@ def save_expenses(expenses):
 
 @app.route("/")
 def home():
-    expenses = load_expenses()
+    if "user_id" not in session:
+        return redirect("/login")
+
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute(
+        "SELECT id, amount, category, note, expense_date AS date "
+        "FROM expenses WHERE user_id = %s ORDER BY expense_date DESC, id DESC",
+        (session["user_id"],)
+    )
+    expenses = cursor.fetchall()
+    db.close()
+
     total = 0
     category_totals = {}
     for e in expenses:
+        e["amount"] = float(e["amount"])
         total = total + e["amount"]
 
         category = e["category"]
@@ -47,14 +60,23 @@ def home():
 
 @app.route("/add", methods=["POST"])
 def add():
+    if "user_id" not in session:
+        return redirect("/login")
+
     amount = float(request.form["amount"])
     category = request.form["category"]
     note = request.form["note"]
     date = request.form["date"]
 
-    expenses = load_expenses()
-    expenses.append({"amount":amount, "category":category, "note":note, "date":date})
-    save_expenses(expenses)
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        "INSERT INTO expenses (user_id, amount, category, note, expense_date) "
+        "VALUES (%s, %s, %s, %s, %s)",
+        (session["user_id"], amount, category, note, date)
+    )
+    db.commit()
+    db.close()
 
     return redirect("/")
 
@@ -113,7 +135,8 @@ def register():
             return render_template("register.html", error="Username already exists. Please choose a different username.")
 
         db.close()
-        return redirect("/")
+        return redirect("/login")
+
     return render_template("register.html", error=None)
 
 @app.route("/login", methods=["GET", "POST"])
